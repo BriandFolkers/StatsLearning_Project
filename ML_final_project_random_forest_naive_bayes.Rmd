@@ -1,0 +1,145 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+# Random Forest
+
+```{r}
+
+library(tree)
+library(randomForest)
+library(dplyr)
+data <- read.csv("training_Upsampled_data.csv")
+data <- select(data, -c(X, Liability.Assets.Flag)) %>% rename(Bankrupt = Bankrupt.) %>% mutate(across(c(Bankrupt),factor))
+subset<-sample(nrow(data),nrow(data)*0.75)
+data.train<-data[subset,]
+data.test<-data[-subset,]
+
+```
+
+
+
+```{r}
+
+set.seed(1)
+data_tree = tree(Bankrupt ~ ., data = data.train)
+summary(data_tree)
+```
+
+```{r}
+plot(data_tree)
+text(data_tree)
+```
+
+```{r}
+set.seed(1)
+data_tree_pred = predict(data_tree, data.test, type = 'class')
+
+table(data_tree_pred, data.test$Bankrupt)
+```
+
+```{r}
+1 - mean(data_tree_pred == data.test$Bankrupt)
+
+#data_tree_cv = cv.tree(data_tree, FUN = prune.tree)
+```
+
+```{r}
+
+set.seed(1)
+#which one of these is better?
+#data_tree_cv = cv.tree(data_tree, FUN = prune.tree)
+data_tree_cv=cv.tree(data_tree) 
+plot(data_tree_cv)
+
+```
+
+```{r}
+set.seed(1)
+
+error_list <- c('NA, i = 1')
+
+for (i in 2:14){
+  
+  data_tree_prune=prune.tree(data_tree,best=i)
+
+  data_tree_pred_prune = predict(data_tree_prune, data.test, type='class')
+  error_list[i] <- (1 - mean(data_tree_pred_prune == data.test$Bankrupt))
+  
+}
+
+
+error_list
+
+
+
+
+
+```
+
+
+
+
+# Naive Bayes
+
+
+
+
+
+```{r}
+
+library(naivebayes)
+
+naivebayes_model <- naive_bayes(Bankrupt ~ ., data = data.train, usekernel = T) 
+summary(naivebayes_model)
+```
+
+```{r}
+
+naivebayes_predict<- predict(naivebayes_model, data.train, type = 'prob')
+summary(naivebayes_predict)
+
+```
+
+```{r}
+
+naivebayes_predict_train_table <- predict(naivebayes_model, data.train)
+(tab1 <- table(naivebayes_predict_train_table, data.train$Bankrupt))
+
+1 - sum(diag(tab1)) / sum(tab1)
+
+```
+
+```{r}
+
+naivebayes_predict_test_table <- predict(naivebayes_model, data.test)
+(tab2 <- table(naivebayes_predict_test_table, data.test$Bankrupt))
+
+1 - sum(diag(tab2)) / sum(tab2)
+
+```
+
+
+```{r}
+library(caret)
+
+nb_cv_model = train(data.train[,2:ncol(data.train)],data.train$Bankrupt,method='nb',trControl=trainControl(method='cv',number=10))
+nb_cv_model
+
+confusionMatrix(nb_cv_model)
+
+```
+
+```{r}
+
+nb_cv_model_pre_processed = train(data.train[,2:ncol(data.train)],data.train$Bankrupt,method='nb',trControl=trainControl(method='cv',number=10), preProc = c("BoxCox", "center", "scale", "pca"))
+nb_cv_model_pre_processed
+
+confusionMatrix(nb_cv_model_pre_processed)
+
+```
+
+```{r}
+# we can add search grid here but I need to go over that with yall
+```
